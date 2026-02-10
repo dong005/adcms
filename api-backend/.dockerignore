@@ -1,0 +1,7 @@
+uploads/
+logs/
+*.log
+.git
+.gitignore
+README.md
+config.prod.yaml

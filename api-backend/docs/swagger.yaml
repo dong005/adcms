@@ -1,0 +1,55 @@
+basePath: /api
+definitions:
+  handler.LoginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  handler.LoginResponse:
+    properties:
+      require_totp:
+        type: boolean
+      temp_token:
+        type: string
+      token:
+        type: string
+    type: object
+host: localhost:8004
+info:
+  contact: {}
+  description: ADCMS 多租户内容管理系统 API 文档
+  title: ADCMS API
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 登录参数
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/handler.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/handler.LoginResponse'
+      summary: 用户登录
+      tags:
+      - 认证
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

@@ -1,0 +1,31 @@
+# Backend
+api-backend/adcms
+api-backend/adcms-api
+api-backend/adcms-api.pid
+api-backend/adcms-server
+api-backend/api.log
+api-backend/logs/
+api-backend/uploads/
+api-backend/config.yaml
+api-backend/config.prod.yaml
+
+# Frontend
+api-frontend/node_modules/
+api-frontend/.pnpm-store/
+api-frontend/apps/web-antd/dist/
+api-frontend/apps/web-antd/node_modules/
+api-frontend/packages/*/node_modules/
+api-frontend/packages/*/dist/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+*.local

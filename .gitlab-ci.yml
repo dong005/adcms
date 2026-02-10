@@ -1,0 +1,32 @@
+stages:
+  - test
+  - build
+
+variables:
+  MYSQL_ROOT_PASSWORD: testpass
+  MYSQL_DATABASE: adcms_test
+
+backend-test:
+  stage: test
+  image: golang:1.24
+  services:
+    - mysql:8.0
+    - redis:7-alpine
+  script:
+    - cd api-backend
+    - go test ./pkg/... ./internal/handler/ -v -count=1
+    - go build -o adcms-api ./cmd/main.go
+
+frontend-build:
+  stage: build
+  image: node:20
+  before_script:
+    - npm install -g pnpm@9
+  script:
+    - cd api-frontend
+    - pnpm install --frozen-lockfile
+    - pnpm run build
+  artifacts:
+    paths:
+      - api-frontend/apps/web-antd/dist/
+    expire_in: 7 days

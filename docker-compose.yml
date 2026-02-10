@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./api-backend
+      dockerfile: Dockerfile
+    container_name: adcms-backend
+    restart: unless-stopped
+    ports:
+      - "8004:8004"
+    volumes:
+      - ./api-backend/config.yaml:/app/config.yaml:ro
+      - backend-uploads:/app/uploads
+      - backend-logs:/app/logs
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - adcms
+
+  frontend:
+    build:
+      context: ./api-frontend
+      dockerfile: Dockerfile
+    container_name: adcms-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+    networks:
+      - adcms
+
+  mysql:
+    image: mysql:8.0
+    container_name: adcms-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: "022018"
+      MYSQL_DATABASE: adcms
+      MYSQL_CHARSET: utf8mb4
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - adcms
+
+  redis:
+    image: redis:7-alpine
+    container_name: adcms-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - adcms
+
+volumes:
+  mysql-data:
+  redis-data:
+  backend-uploads:
+  backend-logs:
+
+networks:
+  adcms:
+    driver: bridge

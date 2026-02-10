@@ -1,0 +1,44 @@
+server:
+  port: 8004
+  mode: debug # debug, release, test
+
+mysql:
+  host: localhost
+  port: 3306
+  user: root
+  password: "your_password"
+  database: adcms
+  charset: utf8mb4
+  max_idle_conns: 10
+  max_open_conns: 100
+
+redis:
+  host: localhost
+  port: 6379
+  password: ""
+  db: 0
+
+jwt:
+  secret: "change-this-to-a-random-secret"
+  expire_hours: 24
+  refresh_hours: 168
+
+log:
+  level: debug
+  filename: logs/app.log
+  max_size: 100
+  max_backups: 30
+  max_age: 7
+
+storage:
+  type: local # local 或 minio
+  local:
+    base_path: ./uploads
+    base_url: /uploads
+  minio:
+    endpoint: localhost:9000
+    access_key: minioadmin
+    secret_key: minioadmin
+    bucket: adcms
+    use_ssl: false
+    base_url: ""
