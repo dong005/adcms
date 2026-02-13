@@ -33,9 +33,21 @@ func (r *MenuRepository) FindByID(id uint) (*model.Menu, error) {
 	return &menu, err
 }
 
-func (r *MenuRepository) FindAll(tenantID uint) ([]model.Menu, error) {
+func (r *MenuRepository) FindAll(tenantID uint, isAdmin bool) ([]model.Menu, error) {
 	var menus []model.Menu
-	err := r.db.Where("tenant_id = 0 OR tenant_id = ?", tenantID).Order("sort ASC, id ASC").Find(&menus).Error
+	query := r.db.Where("status = 1")
+	
+	if isAdmin {
+		// 超管可以看到所有菜单
+		query = query.Order("sort ASC, id ASC")
+	} else {
+		// 租户只能看到 is_tenant=1 的菜单和自己的菜单
+		query = query.Where("tenant_id = 0 OR tenant_id = ?", tenantID).
+			Where("is_tenant = 1").
+			Order("sort ASC, id ASC")
+	}
+	
+	err := query.Find(&menus).Error
 	return menus, err
 }
 

@@ -14,6 +14,7 @@ const (
 	ContextUserID   = "user_id"
 	ContextTenantID = "tenant_id"
 	ContextUsername = "username"
+	ContextIsAdmin  = "is_admin"
 )
 
 func JWTAuth() gin.HandlerFunc {
@@ -51,6 +52,7 @@ func JWTAuth() gin.HandlerFunc {
 		c.Set(ContextUserID, claims.UserID)
 		c.Set(ContextTenantID, claims.TenantID)
 		c.Set(ContextUsername, claims.Username)
+		c.Set(ContextIsAdmin, claims.IsAdmin)
 
 		c.Next()
 	}
@@ -94,4 +96,12 @@ func GetUsername(c *gin.Context) string {
 		return ""
 	}
 	return username.(string)
+}
+
+func GetIsAdmin(c *gin.Context) int8 {
+	isAdmin, exists := c.Get(ContextIsAdmin)
+	if !exists {
+		return 0
+	}
+	return isAdmin.(int8)
 }

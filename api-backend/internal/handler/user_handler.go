@@ -8,6 +8,7 @@ import (
 	"adcms/pkg/excel"
 	"adcms/pkg/utils"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 )
@@ -23,13 +24,21 @@ func NewUserHandler() *UserHandler {
 }
 
 type CreateUserRequest struct {
-	Username string `json:"username" binding:"required"`
-	Password string `json:"password" binding:"required,min=6"`
-	Email    string `json:"email"`
-	Phone    string `json:"phone"`
-	Nickname string `json:"nickname"`
-	Status   int8   `json:"status"`
-	RoleIDs  []uint `json:"role_ids"`
+	Username    string     `json:"username" binding:"required"`
+	Password    string     `json:"password" binding:"required"`
+	Email       string     `json:"email" binding:"email"`
+	Phone       string     `json:"phone"`
+	Nickname    string     `json:"nickname"`
+	Avatar      string     `json:"avatar"`
+	DepartmentID uint       `json:"department_id"`
+	Status      int8       `json:"status"`
+	RoleIDs     []uint     `json:"role_ids" binding:"required"`
+	IsAdmin     int8       `json:"is_admin"`                    // 0=普通用户 1=管理员(租户) 2=超级管理员
+	Company     string     `json:"company"`                     // 租户公司名称
+	Domain      string     `json:"domain"`                      // 租户绑定域名
+	ExpireTime  *time.Time `json:"expire_time"`                 // 租户到期时间
+	MaxUsers    uint       `json:"max_users"`                   // 最大用户数，0=不限
+	Remark      string     `json:"remark"`                      // 备注
 }
 
 func (h *UserHandler) Create(c *gin.Context) {
@@ -68,7 +77,15 @@ func (h *UserHandler) Create(c *gin.Context) {
 		Email:           req.Email,
 		Phone:           req.Phone,
 		Nickname:        req.Nickname,
+		Avatar:          req.Avatar,
+		DepartmentID:    req.DepartmentID,
 		Status:          req.Status,
+		IsAdmin:         req.IsAdmin,
+		Company:         req.Company,
+		Domain:          req.Domain,
+		ExpireTime:      req.ExpireTime,
+		MaxUsers:        req.MaxUsers,
+		Remark:          req.Remark,
 	}
 
 	if err := h.userRepo.Create(&user); err != nil {
@@ -80,8 +97,8 @@ func (h *UserHandler) Create(c *gin.Context) {
 		h.userRepo.AssignRoles(user.ID, req.RoleIDs)
 	}
 
-	// 如果超管创建的是代理商（admin角色），tenant_id 设为新用户自己的 ID
-	if tenantID == 0 && isAdminRole(req.RoleIDs) {
+	// 如果超管创建的是管理员（is_admin=1），tenant_id 设为新用户自己的 ID
+	if tenantID == 0 && req.IsAdmin == 1 {
 		user.TenantID = user.ID
 		h.userRepo.Update(&user)
 	}
@@ -90,10 +107,19 @@ func (h *UserHandler) Create(c *gin.Context) {
 }
 
 type UpdateUserRequest struct {
-	Email    string `json:"email"`
-	Phone    string `json:"phone"`
-	Nickname string `json:"nickname"`
-	Status   int8   `json:"status"`
+	Email       string     `json:"email" binding:"email"`
+	Phone       string     `json:"phone"`
+	Nickname    string     `json:"nickname"`
+	Avatar      string     `json:"avatar"`
+	DepartmentID uint       `json:"department_id"`
+	Status      int8       `json:"status"`
+	RoleIDs     []uint     `json:"role_ids"`
+	// 新增字段
+	Company     string     `json:"company"`                     // 租户公司名称
+	Domain      string     `json:"domain"`                      // 租户绑定域名
+	ExpireTime  *time.Time `json:"expire_time"`                 // 租户到期时间
+	MaxUsers    uint       `json:"max_users"`                   // 最大用户数，0=不限
+	Remark      string     `json:"remark"`                      // 备注
 }
 
 func (h *UserHandler) Update(c *gin.Context) {
@@ -127,11 +153,23 @@ func (h *UserHandler) Update(c *gin.Context) {
 	user.Email = req.Email
 	user.Phone = req.Phone
 	user.Nickname = req.Nickname
+	user.Avatar = req.Avatar
+	user.DepartmentID = req.DepartmentID
 	user.Status = req.Status
+	user.Company = req.Company
+	user.Domain = req.Domain
+	user.ExpireTime = req.ExpireTime
+	user.MaxUsers = req.MaxUsers
+	user.Remark = req.Remark
 
 	if err := h.userRepo.Update(user); err != nil {
 		utils.ServerError(c, "更新用户失败")
 		return
+	}
+
+	// 更新角色
+	if req.RoleIDs != nil {
+		h.userRepo.AssignRoles(user.ID, req.RoleIDs)
 	}
 
 	utils.Success(c, user)
@@ -168,7 +206,16 @@ func (h *UserHandler) Delete(c *gin.Context) {
 }
 
 func (h *UserHandler) List(c *gin.Context) {
-	tenantID := middleware.GetTenantID(c)
+	isAdmin := middleware.GetIsAdmin(c)
+	
+	// 超级管理员可以看到所有用户，其他用户只能看到自己租户的用户
+	var tenantID uint
+	if isAdmin == 2 { // 超级管理员
+		tenantID = 0 // 查询所有租户
+	} else {
+		tenantID = middleware.GetTenantID(c)
+	}
+	
 	page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
 	pageSize, _ := strconv.Atoi(c.DefaultQuery("page_size", "10"))
 	keyword := c.Query("keyword")
@@ -370,4 +417,57 @@ func (h *UserHandler) Import(c *gin.Context) {
 		}
 	}
 	utils.Success(c, map[string]int{"imported": imported, "total": len(records)})
+}
+
+func (h *UserHandler) AssignMenus(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		utils.BadRequest(c, "参数错误")
+		return
+	}
+
+	var req AssignMenusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequest(c, "参数错误")
+		return
+	}
+
+	if err := h.userRepo.AssignMenus(uint(id), req.MenuIDs); err != nil {
+		utils.ServerError(c, "分配菜单失败")
+		return
+	}
+
+	utils.SuccessWithMessage(c, "分配成功", nil)
+}
+
+// UnlockUser 解锁因长期未登录被锁定的用户（仅超管）
+func (h *UserHandler) UnlockUser(c *gin.Context) {
+	if !middleware.IsSuperAdmin(middleware.GetUserID(c)) {
+		utils.Forbidden(c, "仅超级管理员可解锁用户")
+		return
+	}
+
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		utils.BadRequest(c, "参数错误")
+		return
+	}
+
+	user, err := h.userRepo.FindByID(uint(id))
+	if err != nil {
+		utils.Fail(c, 3002, "用户不存在")
+		return
+	}
+
+	if user.Status != 2 {
+		utils.Fail(c, 4004, "该用户未被锁定")
+		return
+	}
+
+	if err := h.userRepo.UpdateStatus(uint(id), 1); err != nil {
+		utils.ServerError(c, "解锁失败")
+		return
+	}
+
+	utils.SuccessWithMessage(c, "用户已解锁", nil)
 }

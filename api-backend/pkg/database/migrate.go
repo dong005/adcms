@@ -12,6 +12,7 @@ func AutoMigrate() error {
 		&model.Role{},
 		&model.Permission{},
 		&model.UserRole{},
+		&model.UserMenu{}, // 新增
 		&model.RolePermission{},
 		&model.RoleMenu{},
 		&model.Menu{},
@@ -28,6 +29,14 @@ func AutoMigrate() error {
 		&model.Notification{},
 		&model.EmailLog{},
 		&model.SmsLog{},
+		&model.ConfigGroup{},
+		&model.ConfigWeb{},
+		&model.DictType{},
+		&model.Dict{},
+		&model.Site{},
+		&model.Link{},
+		&model.Crontab{},
+		&model.City{},
 	)
 }
 
@@ -75,6 +84,7 @@ func InitData() error {
 		Nickname:    "管理员",
 		Status:      1,
 		LastLoginAt: &now,
+		IsAdmin:     2, // 超级管理员
 	}
 	if err := DB.Create(&admin).Error; err != nil {
 		return err
@@ -90,18 +100,19 @@ func InitData() error {
 	}
 
 	menus := []model.Menu{
-		{TenantID: 0, ParentID: 0, Name: "Dashboard", Path: "/dashboard", Component: "BasicLayout", Icon: "lucide:layout-dashboard", Title: "仪表盘", Sort: 0, Status: 1},
-		{TenantID: 0, ParentID: 1, Name: "Analytics", Path: "/dashboard/analytics", Component: "/dashboard/analytics/index", Icon: "lucide:area-chart", Title: "分析页", Sort: 0, Status: 1},
-		{TenantID: 0, ParentID: 1, Name: "Workspace", Path: "/dashboard/workspace", Component: "/dashboard/workspace/index", Icon: "carbon:workspace", Title: "工作台", Sort: 1, Status: 1},
-		{TenantID: 0, ParentID: 0, Name: "System", Path: "/system", Component: "BasicLayout", Icon: "lucide:settings", Title: "系统管理", Sort: 100, Status: 1},
-		{TenantID: 0, ParentID: 4, Name: "UserManagement", Path: "/system/user", Component: "/system/user/index", Icon: "lucide:users", Title: "用户管理", Sort: 0, Status: 1},
-		{TenantID: 0, ParentID: 4, Name: "RoleManagement", Path: "/system/role", Component: "/system/role/index", Icon: "lucide:shield", Title: "角色管理", Sort: 1, Status: 1},
-		{TenantID: 0, ParentID: 4, Name: "MenuManagement", Path: "/system/menu", Component: "/system/menu/index", Icon: "lucide:menu", Title: "菜单管理", Sort: 2, Status: 1},
-		{TenantID: 0, ParentID: 0, Name: "Content", Path: "/cms", Component: "BasicLayout", Icon: "lucide:file-text", Title: "内容管理", Sort: 50, Status: 1},
-		{TenantID: 0, ParentID: 10, Name: "ArticleManagement", Path: "/cms/article", Component: "/cms/article/index", Icon: "lucide:newspaper", Title: "文章管理", Sort: 0, Status: 1},
-		{TenantID: 0, ParentID: 10, Name: "CategoryManagement", Path: "/cms/category", Component: "/cms/category/index", Icon: "lucide:folder-tree", Title: "分类管理", Sort: 1, Status: 1},
-		{TenantID: 0, ParentID: 10, Name: "TagManagement", Path: "/cms/tag", Component: "/cms/tag/index", Icon: "lucide:tags", Title: "标签管理", Sort: 2, Status: 1},
-		{TenantID: 0, ParentID: 10, Name: "MediaManagement", Path: "/cms/media", Component: "/cms/media/index", Icon: "lucide:image", Title: "媒体管理", Sort: 3, Status: 1},
+		{TenantID: 0, ParentID: 0, Name: "Dashboard", Path: "/dashboard", Component: "BasicLayout", Icon: "lucide:layout-dashboard", Title: "仪表盘", Sort: 0, Status: 1, IsTenant: 1, Type: 1},
+		{TenantID: 0, ParentID: 1, Name: "Analytics", Path: "/dashboard/analytics", Component: "/dashboard/analytics/index", Icon: "lucide:area-chart", Title: "分析页", Sort: 0, Status: 1, IsTenant: 1, Type: 2},
+		{TenantID: 0, ParentID: 1, Name: "Workspace", Path: "/dashboard/workspace", Component: "/dashboard/workspace/index", Icon: "carbon:workspace", Title: "工作台", Sort: 1, Status: 1, IsTenant: 1, Type: 2},
+		{TenantID: 0, ParentID: 0, Name: "System", Path: "/system", Component: "BasicLayout", Icon: "lucide:settings", Title: "系统管理", Sort: 100, Status: 1, IsTenant: 0, Type: 1},
+		{TenantID: 0, ParentID: 4, Name: "AdminManagement", Path: "/system/admin", Component: "/system/admin/index", Icon: "lucide:shield-check", Title: "管理员管理", Sort: -1, Status: 1, IsTenant: 0, Type: 2},
+		{TenantID: 0, ParentID: 4, Name: "UserManagement", Path: "/system/user", Component: "/system/user/index", Icon: "lucide:users", Title: "用户管理", Sort: 0, Status: 1, IsTenant: 1, Type: 2},
+		{TenantID: 0, ParentID: 4, Name: "RoleManagement", Path: "/system/role", Component: "/system/role/index", Icon: "lucide:shield", Title: "角色管理", Sort: 1, Status: 1, IsTenant: 1, Type: 2},
+		{TenantID: 0, ParentID: 4, Name: "MenuManagement", Path: "/system/menu", Component: "/system/menu/index", Icon: "lucide:menu", Title: "菜单管理", Sort: 2, Status: 1, IsTenant: 1, Type: 2},
+		{TenantID: 0, ParentID: 0, Name: "Content", Path: "/cms", Component: "BasicLayout", Icon: "lucide:file-text", Title: "内容管理", Sort: 50, Status: 1, IsTenant: 1, Type: 1},
+		{TenantID: 0, ParentID: 10, Name: "ArticleManagement", Path: "/cms/article", Component: "/cms/article/index", Icon: "lucide:newspaper", Title: "文章管理", Sort: 0, Status: 1, IsTenant: 1, Type: 2},
+		{TenantID: 0, ParentID: 10, Name: "CategoryManagement", Path: "/cms/category", Component: "/cms/category/index", Icon: "lucide:folder-tree", Title: "分类管理", Sort: 1, Status: 1, IsTenant: 1, Type: 2},
+		{TenantID: 0, ParentID: 10, Name: "TagManagement", Path: "/cms/tag", Component: "/cms/tag/index", Icon: "lucide:tags", Title: "标签管理", Sort: 2, Status: 1, IsTenant: 1, Type: 2},
+		{TenantID: 0, ParentID: 10, Name: "MediaManagement", Path: "/cms/media", Component: "/cms/media/index", Icon: "lucide:image", Title: "媒体管理", Sort: 3, Status: 1, IsTenant: 1, Type: 2},
 	}
 
 	for _, menu := range menus {

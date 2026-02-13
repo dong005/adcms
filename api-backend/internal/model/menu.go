@@ -9,7 +9,7 @@ type Menu struct {
 	Component        string `gorm:"size:255" json:"component"`
 	Redirect         string `gorm:"size:255" json:"redirect"`
 	Icon             string `gorm:"size:50" json:"icon"`
-	Title            string `gorm:"size:50" json:"title"`
+	Title            string `gorm:"size:50;not null" json:"title"`
 	HideInMenu       int8   `gorm:"default:0" json:"hide_in_menu"`
 	HideInTab        int8   `gorm:"default:0" json:"hide_in_tab"`
 	HideInBreadcrumb int8   `gorm:"default:0" json:"hide_in_breadcrumb"`
@@ -18,6 +18,10 @@ type Menu struct {
 	Sort             int    `gorm:"default:0" json:"sort"`
 	Status           int8   `gorm:"default:1" json:"status"`
 	PermissionCode   string `gorm:"size:100" json:"permission_code"`
+	// 新增字段
+	IsTenant         int8   `gorm:"default:1" json:"is_tenant"`      // 1=租户可见 0=仅超管
+	IsPublic         int8   `gorm:"default:0" json:"is_public"`      // 1=公共(不需权限)
+	Type             int8   `gorm:"default:2" json:"type"`           // 1=目录 2=菜单 3=页面 4=按钮/权限
 	Children         []Menu `gorm:"-" json:"children,omitempty"`
 }
 

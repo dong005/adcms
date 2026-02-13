@@ -29,6 +29,7 @@ func Setup() {
 	// 每天凌晨1点清理30天前的操作日志
 	C.AddFunc("0 0 1 * * *", CleanOldOperationLogs)
 
+
 	C.Start()
 	log.Println("[Cron] 定时任务调度器已启动")
 }
@@ -99,6 +100,7 @@ func CleanOldOperationLogs() {
 		log.Printf("[Cron] 清理30天前登录日志: %d 条", result2.RowsAffected)
 	}
 }
+
 
 // ListJobs 列出所有定时任务
 func ListJobs() []map[string]interface{} {

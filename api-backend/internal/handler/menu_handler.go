@@ -40,6 +40,10 @@ type CreateMenuRequest struct {
 	Sort             int    `json:"sort"`
 	Status           int8   `json:"status"`
 	PermissionCode   string `json:"permission_code"`
+	// 新增字段
+	IsTenant         int8   `json:"is_tenant"`      // 1=租户可见 0=仅超管
+	IsPublic         int8   `json:"is_public"`      // 1=公共(不需权限)
+	Type             int8   `json:"type"`           // 1=目录 2=菜单 3=页面 4=按钮/权限
 }
 
 func (h *MenuHandler) Create(c *gin.Context) {
@@ -67,6 +71,9 @@ func (h *MenuHandler) Create(c *gin.Context) {
 		Sort:             req.Sort,
 		Status:           req.Status,
 		PermissionCode:   req.PermissionCode,
+		IsTenant:         req.IsTenant,
+		IsPublic:         req.IsPublic,
+		Type:             req.Type,
 	}
 
 	if err := h.menuRepo.Create(&menu); err != nil {
@@ -111,6 +118,9 @@ func (h *MenuHandler) Update(c *gin.Context) {
 	menu.Sort = req.Sort
 	menu.Status = req.Status
 	menu.PermissionCode = req.PermissionCode
+	menu.IsTenant = req.IsTenant
+	menu.IsPublic = req.IsPublic
+	menu.Type = req.Type
 
 	if err := h.menuRepo.Update(menu); err != nil {
 		utils.ServerError(c, "更新菜单失败")
@@ -147,7 +157,8 @@ func (h *MenuHandler) Delete(c *gin.Context) {
 
 func (h *MenuHandler) List(c *gin.Context) {
 	tenantID := middleware.GetTenantID(c)
-	menus, err := h.menuRepo.FindAll(tenantID)
+	isAdmin := middleware.IsAdmin(middleware.GetUserID(c))
+	menus, err := h.menuRepo.FindAll(tenantID, isAdmin)
 	if err != nil {
 		utils.ServerError(c, "查询失败")
 		return
@@ -159,7 +170,8 @@ func (h *MenuHandler) List(c *gin.Context) {
 
 func (h *MenuHandler) Tree(c *gin.Context) {
 	tenantID := middleware.GetTenantID(c)
-	menus, err := h.menuRepo.FindAll(tenantID)
+	isAdmin := middleware.IsAdmin(middleware.GetUserID(c))
+	menus, err := h.menuRepo.FindAll(tenantID, isAdmin)
 	if err != nil {
 		utils.ServerError(c, "查询失败")
 		return
@@ -190,7 +202,7 @@ func (h *MenuHandler) UserMenus(c *gin.Context) {
 	var menus []model.Menu
 	if isSuperAdmin {
 		tenantID := middleware.GetTenantID(c)
-		menus, err = h.menuRepo.FindAll(tenantID)
+		menus, err = h.menuRepo.FindAll(tenantID, true)
 	} else {
 		menus, err = h.menuRepo.FindByRoleIDs(roleIDs)
 	}
@@ -235,6 +247,45 @@ func (h *MenuHandler) AssignRoleMenus(c *gin.Context) {
 
 	if err := h.roleRepo.AssignMenus(uint(roleID), req.MenuIDs); err != nil {
 		utils.ServerError(c, "分配菜单失败")
+		return
+	}
+
+	utils.SuccessWithMessage(c, "分配成功", nil)
+}
+
+// GetUserMenus 获取用户的独立菜单权限
+func (h *MenuHandler) GetUserMenus(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		utils.BadRequest(c, "参数错误")
+		return
+	}
+
+	menus, err := h.userRepo.GetUserMenus(uint(id))
+	if err != nil {
+		utils.ServerError(c, "查询失败")
+		return
+	}
+
+	utils.Success(c, menus)
+}
+
+// AssignUserMenus 分配用户的独立菜单权限
+func (h *MenuHandler) AssignUserMenus(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		utils.BadRequest(c, "参数错误")
+		return
+	}
+
+	var req AssignMenusRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequest(c, "参数错误")
+		return
+	}
+
+	if err := h.userRepo.AssignMenus(uint(id), req.MenuIDs); err != nil {
+		utils.ServerError(c, "分配失败")
 		return
 	}
 

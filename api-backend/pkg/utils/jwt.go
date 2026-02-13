@@ -12,6 +12,7 @@ type Claims struct {
 	UserID   uint   `json:"user_id"`
 	TenantID uint   `json:"tenant_id"`
 	Username string `json:"username"`
+	IsAdmin  int8   `json:"is_admin"`
 	jwt.RegisteredClaims
 }
 
@@ -23,12 +24,13 @@ type TempClaims struct {
 	jwt.RegisteredClaims
 }
 
-func GenerateToken(userID, tenantID uint, username string) (string, error) {
+func GenerateToken(userID, tenantID uint, username string, isAdmin int8) (string, error) {
 	cfg := config.GlobalConfig.JWT
 	claims := Claims{
 		UserID:   userID,
 		TenantID: tenantID,
 		Username: username,
+		IsAdmin:  isAdmin,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(time.Duration(cfg.ExpireHours) * time.Hour)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -100,5 +102,5 @@ func RefreshToken(tokenString string) (string, error) {
 		return "", err
 	}
 
-	return GenerateToken(claims.UserID, claims.TenantID, claims.Username)
+	return GenerateToken(claims.UserID, claims.TenantID, claims.Username, claims.IsAdmin)
 }

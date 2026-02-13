@@ -82,10 +82,30 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	if user.Status != 1 {
+	if user.Status == 0 {
 		h.recordLoginLog(user.TenantID, user.ID, req.Username, c.ClientIP(), c.Request.UserAgent(), 0, "用户已禁用")
 		utils.Fail(c, 1002, "用户已被禁用")
 		return
+	}
+	if user.Status == 2 {
+		h.recordLoginLog(user.TenantID, user.ID, req.Username, c.ClientIP(), c.Request.UserAgent(), 0, "用户已锁定")
+		utils.Fail(c, 1012, "账号已被锁定，请联系管理员解锁")
+		return
+	}
+
+	// 动态检查：用户长期未登录自动锁定（从 config_webs 读取天数，0=不锁定）
+	if user.IsAdmin != 2 && user.LastLoginAt != nil {
+		lockDays := h.getInactiveLockDays()
+		if lockDays > 0 {
+			threshold := time.Now().AddDate(0, 0, -lockDays)
+			if user.LastLoginAt.Before(threshold) {
+				// 自动将状态设为锁定
+				h.userRepo.UpdateStatus(user.ID, 2)
+				h.recordLoginLog(user.TenantID, user.ID, req.Username, c.ClientIP(), c.Request.UserAgent(), 0, fmt.Sprintf("超过%d天未登录自动锁定", lockDays))
+				utils.Fail(c, 1012, fmt.Sprintf("账号因超过%d天未登录已被锁定，请联系管理员解锁", lockDays))
+				return
+			}
+		}
 	}
 
 	if user.TOTPEnabled == 1 {
@@ -101,7 +121,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
-	token, err := utils.GenerateToken(user.ID, user.TenantID, user.Username)
+	token, err := utils.GenerateToken(user.ID, user.TenantID, user.Username, user.IsAdmin)
 	if err != nil {
 		utils.ServerError(c, "生成token失败")
 		return
@@ -147,7 +167,7 @@ func (h *AuthHandler) VerifyTOTP(c *gin.Context) {
 		return
 	}
 
-	token, err := utils.GenerateToken(user.ID, user.TenantID, user.Username)
+	token, err := utils.GenerateToken(user.ID, user.TenantID, user.Username, user.IsAdmin)
 	if err != nil {
 		utils.ServerError(c, "生成token失败")
 		return
@@ -606,6 +626,18 @@ func (h *AuthHandler) BindPhone(c *gin.Context) {
 	database.RDB.Del(ctx, codeKey)
 
 	utils.SuccessWithMessage(c, "手机绑定成功", nil)
+}
+
+// getInactiveLockDays 从 config_webs 表读取用户未登录锁定天数，默认30，0=不锁定
+func (h *AuthHandler) getInactiveLockDays() int {
+	var web model.ConfigWeb
+	if err := database.DB.Where("code = ? AND tenant_id = 0", "user_lock_inactive_days").First(&web).Error; err == nil {
+		var v int
+		if n, _ := fmt.Sscanf(web.Value, "%d", &v); n == 1 && v >= 0 {
+			return v
+		}
+	}
+	return 30
 }
 
 func (h *AuthHandler) recordLoginLog(tenantID, userID uint, username, ip, userAgent string, status int8, message string) {

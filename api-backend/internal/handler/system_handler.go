@@ -61,6 +61,162 @@ func (h *ConfigHandler) Update(c *gin.Context) {
 	utils.SuccessWithMessage(c, "更新成功", nil)
 }
 
+// ========== ConfigGroup ==========
+
+func (h *ConfigHandler) ListGroups(c *gin.Context) {
+	groups, err := h.configRepo.ListGroups()
+	if err != nil {
+		utils.ServerError(c, "查询失败")
+		return
+	}
+	utils.Success(c, groups)
+}
+
+func (h *ConfigHandler) CreateGroup(c *gin.Context) {
+	if !middleware.IsSuperAdmin(middleware.GetUserID(c)) {
+		utils.Fail(c, 4003, "仅超级管理员可操作")
+		return
+	}
+	var req struct {
+		Name string `json:"name" binding:"required"`
+		Sort int    `json:"sort"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequest(c, "参数错误")
+		return
+	}
+	group := model.ConfigGroup{Name: req.Name, Sort: req.Sort}
+	if err := h.configRepo.CreateGroup(&group); err != nil {
+		utils.ServerError(c, "创建失败")
+		return
+	}
+	utils.SuccessWithMessage(c, "创建成功", group)
+}
+
+func (h *ConfigHandler) UpdateGroup(c *gin.Context) {
+	if !middleware.IsSuperAdmin(middleware.GetUserID(c)) {
+		utils.Fail(c, 4003, "仅超级管理员可操作")
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		utils.BadRequest(c, "参数错误")
+		return
+	}
+	group, err := h.configRepo.FindGroupByID(uint(id))
+	if err != nil {
+		utils.Fail(c, 404, "分组不存在")
+		return
+	}
+	var req struct {
+		Name string `json:"name"`
+		Sort int    `json:"sort"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequest(c, "参数错误")
+		return
+	}
+	if req.Name != "" {
+		group.Name = req.Name
+	}
+	group.Sort = req.Sort
+	if err := h.configRepo.UpdateGroup(group); err != nil {
+		utils.ServerError(c, "更新失败")
+		return
+	}
+	utils.SuccessWithMessage(c, "更新成功", group)
+}
+
+func (h *ConfigHandler) DeleteGroup(c *gin.Context) {
+	if !middleware.IsSuperAdmin(middleware.GetUserID(c)) {
+		utils.Fail(c, 4003, "仅超级管理员可操作")
+		return
+	}
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		utils.BadRequest(c, "参数错误")
+		return
+	}
+	if err := h.configRepo.DeleteGroup(uint(id)); err != nil {
+		utils.ServerError(c, "删除失败")
+		return
+	}
+	utils.SuccessWithMessage(c, "删除成功", nil)
+}
+
+func (h *ConfigHandler) ListByGroup(c *gin.Context) {
+	groupID, err := strconv.ParseUint(c.Query("group_id"), 10, 64)
+	if err != nil {
+		utils.BadRequest(c, "参数错误：group_id 必填")
+		return
+	}
+	tenantID := middleware.GetTenantID(c)
+	configs, err := h.configRepo.FindByGroup(tenantID, uint(groupID))
+	if err != nil {
+		utils.ServerError(c, "查询失败")
+		return
+	}
+	utils.Success(c, configs)
+}
+
+// ========== ConfigWeb ==========
+
+func (h *ConfigHandler) ListWebs(c *gin.Context) {
+	isAdmin := middleware.GetIsAdmin(c)
+	var tenantID uint
+	if isAdmin == 2 {
+		tenantID = 0
+	} else {
+		tenantID = middleware.GetTenantID(c)
+	}
+	webs, err := h.configRepo.ListWebs(tenantID)
+	if err != nil {
+		utils.ServerError(c, "查询失败")
+		return
+	}
+	utils.Success(c, webs)
+}
+
+func (h *ConfigHandler) SaveWebs(c *gin.Context) {
+	var req struct {
+		Webs []struct {
+			Name  string `json:"name"`
+			Code  string `json:"code" binding:"required"`
+			Value string `json:"value"`
+			Sort  int    `json:"sort"`
+		} `json:"webs" binding:"required"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequest(c, "参数错误")
+		return
+	}
+	tenantID := middleware.GetTenantID(c)
+	for _, w := range req.Webs {
+		web := model.ConfigWeb{
+			TenantBaseModel: model.TenantBaseModel{TenantID: tenantID},
+			Name:            w.Name,
+			Code:            w.Code,
+			Value:           w.Value,
+			Sort:            w.Sort,
+		}
+		h.configRepo.UpsertWeb(&web)
+	}
+	utils.SuccessWithMessage(c, "保存成功", nil)
+}
+
+func (h *ConfigHandler) DeleteWeb(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		utils.BadRequest(c, "参数错误")
+		return
+	}
+	if err := h.configRepo.DeleteWeb(uint(id)); err != nil {
+		utils.ServerError(c, "删除失败")
+		return
+	}
+	utils.SuccessWithMessage(c, "删除成功", nil)
+}
+
 type LogHandler struct {
 	logRepo *repository.LogRepository
 }

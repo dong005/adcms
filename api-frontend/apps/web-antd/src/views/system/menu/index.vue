@@ -25,6 +25,9 @@ const formState = reactive({
   hide_in_menu: 0,
   keep_alive: 1,
   frame_src: '',
+  is_tenant: 1,
+  is_public: 0,
+  type: 2,
   sort: 0,
   status: 1,
   permission_code: '',
@@ -33,12 +36,14 @@ const formState = reactive({
 const columns = [
   { title: '标题', dataIndex: 'title', width: 180 },
   { title: '名称', dataIndex: 'name', width: 150 },
+  { title: '类型', dataIndex: 'type', width: 80 },
   { title: '路径', dataIndex: 'path', width: 200 },
   { title: '组件', dataIndex: 'component', width: 200 },
   { title: '图标', dataIndex: 'icon', width: 120 },
   { title: '排序', dataIndex: 'sort', width: 70 },
   { title: '状态', dataIndex: 'status', width: 80 },
-  { title: '隐藏', dataIndex: 'hide_in_menu', width: 70 },
+  { title: '租户可见', dataIndex: 'is_tenant', width: 80 },
+  { title: '公共', dataIndex: 'is_public', width: 70 },
   { title: '操作', dataIndex: 'action', width: 200, fixed: 'right' as const },
 ];
 
@@ -67,6 +72,7 @@ function handleAdd(parentId = 0) {
   Object.assign(formState, {
     id: 0, parent_id: parentId, name: '', path: '', component: '', redirect: '',
     icon: '', title: '', hide_in_menu: 0, keep_alive: 1, frame_src: '',
+    is_tenant: 1, is_public: 0, type: 2,
     sort: 0, status: 1, permission_code: '',
   });
   modalVisible.value = true;
@@ -79,6 +85,7 @@ function handleEdit(record: MenuRecord) {
     path: record.path, component: record.component, redirect: record.redirect,
     icon: record.icon, title: record.title, hide_in_menu: record.hide_in_menu,
     keep_alive: record.keep_alive, frame_src: record.frame_src,
+    is_tenant: record.is_tenant, is_public: record.is_public, type: record.type,
     sort: record.sort, status: record.status, permission_code: record.permission_code,
   });
   modalVisible.value = true;
@@ -127,14 +134,24 @@ onMounted(fetchData);
         default-expand-all-rows
       >
         <template #bodyCell="{ column, record }">
+          <template v-if="column.dataIndex === 'type'">
+            <Tag :color="(record as MenuRecord).type === 1 ? 'blue' : (record as MenuRecord).type === 2 ? 'green' : (record as MenuRecord).type === 3 ? 'orange' : 'purple'">
+              {{ (record as MenuRecord).type === 1 ? '目录' : (record as MenuRecord).type === 2 ? '菜单' : (record as MenuRecord).type === 3 ? '页面' : '按钮' }}
+            </Tag>
+          </template>
           <template v-if="column.dataIndex === 'status'">
             <Tag :color="(record as MenuRecord).status === 1 ? 'green' : 'red'">
               {{ (record as MenuRecord).status === 1 ? '启用' : '禁用' }}
             </Tag>
           </template>
-          <template v-if="column.dataIndex === 'hide_in_menu'">
-            <Tag :color="(record as MenuRecord).hide_in_menu === 1 ? 'orange' : 'default'">
-              {{ (record as MenuRecord).hide_in_menu === 1 ? '是' : '否' }}
+          <template v-if="column.dataIndex === 'is_tenant'">
+            <Tag :color="(record as MenuRecord).is_tenant === 1 ? 'green' : 'red'">
+              {{ (record as MenuRecord).is_tenant === 1 ? '是' : '否' }}
+            </Tag>
+          </template>
+          <template v-if="column.dataIndex === 'is_public'">
+            <Tag :color="(record as MenuRecord).is_public === 1 ? 'blue' : 'default'">
+              {{ (record as MenuRecord).is_public === 1 ? '是' : '否' }}
             </Tag>
           </template>
           <template v-if="column.dataIndex === 'action'">
@@ -180,6 +197,14 @@ onMounted(fetchData);
           <FormItem label="图标">
             <Input v-model:value="formState.icon" placeholder="如 lucide:users" />
           </FormItem>
+          <FormItem label="类型">
+            <Select v-model:value="formState.type">
+              <SelectOption :value="1">目录</SelectOption>
+              <SelectOption :value="2">菜单</SelectOption>
+              <SelectOption :value="3">页面</SelectOption>
+              <SelectOption :value="4">按钮</SelectOption>
+            </Select>
+          </FormItem>
           <FormItem label="权限标识">
             <Input v-model:value="formState.permission_code" placeholder="如 user:list" />
           </FormItem>
@@ -191,6 +216,12 @@ onMounted(fetchData);
               <SelectOption :value="1">启用</SelectOption>
               <SelectOption :value="0">禁用</SelectOption>
             </Select>
+          </FormItem>
+          <FormItem label="租户可见">
+            <Switch v-model:checked="formState.is_tenant" :checked-value="1" :un-checked-value="0" />
+          </FormItem>
+          <FormItem label="公共菜单">
+            <Switch v-model:checked="formState.is_public" :checked-value="1" :un-checked-value="0" />
           </FormItem>
           <FormItem label="隐藏菜单">
             <Switch v-model:checked="formState.hide_in_menu" :checked-value="1" :un-checked-value="0" />

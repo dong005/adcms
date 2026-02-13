@@ -25,6 +25,7 @@ func SetupRouter(mode string) *gin.Engine {
 	menuHandler := handler.NewMenuHandler()
 	userHandler := handler.NewUserHandler()
 	roleHandler := handler.NewRoleHandler()
+	adminHandler := handler.NewAdminHandler()
 	categoryHandler := handler.NewCategoryHandler()
 	tagHandler := handler.NewTagHandler()
 	articleHandler := handler.NewArticleHandler()
@@ -34,6 +35,12 @@ func SetupRouter(mode string) *gin.Engine {
 	permissionHandler := handler.NewPermissionHandler()
 	departmentHandler := handler.NewDepartmentHandler()
 	notificationHandler := handler.NewNotificationHandler()
+	dictHandler := handler.NewDictHandler()
+	siteHandler := handler.NewSiteHandler()
+	linkHandler := handler.NewLinkHandler()
+	crontabHandler := handler.NewCrontabHandler()
+	databaseHandler := handler.NewDatabaseHandler()
+	cityHandler := handler.NewCityHandler()
 
 	api := r.Group("/api")
 	api.Use(middleware.GlobalRateLimit(300)) // 每个IP每分钟最多300次请求
@@ -77,6 +84,8 @@ func SetupRouter(mode string) *gin.Engine {
 				menus.POST("", menuHandler.Create)
 				menus.PUT("/:id", menuHandler.Update)
 				menus.DELETE("/:id", menuHandler.Delete)
+				menus.GET("/:id/menus", menuHandler.GetUserMenus) // 新增
+				menus.PUT("/:id/menus", menuHandler.AssignUserMenus) // 新增
 			}
 
 			// Users
@@ -90,9 +99,24 @@ func SetupRouter(mode string) *gin.Engine {
 				users.PUT("/:id/status", userHandler.ToggleStatus)
 				users.PUT("/:id/reset-password", userHandler.ResetPassword)
 				users.PUT("/:id/roles", userHandler.AssignRoles)
+				users.PUT("/:id/menus", userHandler.AssignMenus) // 新增
+				users.PUT("/:id/unlock", userHandler.UnlockUser)
 				users.GET("/export", userHandler.Export)
 				users.GET("/import-template", userHandler.ImportTemplate)
 				users.POST("/import", userHandler.Import)
+			}
+
+			// Admins - 管理员管理（仅超管）
+			admins := protected.Group("/admins")
+			{
+				admins.GET("", adminHandler.List)
+				admins.GET("/:id", adminHandler.Detail)
+				admins.POST("", adminHandler.Create)
+				admins.PUT("/:id", adminHandler.Update)
+				admins.DELETE("/:id", adminHandler.Delete)
+				admins.PUT("/:id/status", adminHandler.ToggleStatus)
+				admins.PUT("/:id/reset-password", adminHandler.ResetPassword)
+				admins.GET("/:id/statistics", adminHandler.Statistics)
 			}
 
 			// Roles
@@ -162,6 +186,7 @@ func SetupRouter(mode string) *gin.Engine {
 			{
 				configs.GET("", configHandler.List)
 				configs.PUT("", configHandler.Update)
+				configs.GET("/by-group", configHandler.ListByGroup)
 				configs.GET("/email", configHandler.GetEmailConfig)
 				configs.PUT("/email", configHandler.UpdateEmailConfig)
 				configs.POST("/email/test", configHandler.TestEmail)
@@ -170,6 +195,23 @@ func SetupRouter(mode string) *gin.Engine {
 				configs.POST("/sms/test", configHandler.TestSms)
 				configs.GET("/log", configHandler.GetLogConfig)
 				configs.PUT("/log", configHandler.UpdateLogConfig)
+			}
+
+			// Config Groups
+			configGroups := protected.Group("/config-groups")
+			{
+				configGroups.GET("", configHandler.ListGroups)
+				configGroups.POST("", configHandler.CreateGroup)
+				configGroups.PUT("/:id", configHandler.UpdateGroup)
+				configGroups.DELETE("/:id", configHandler.DeleteGroup)
+			}
+
+			// Config Webs (网站设置)
+			configWebs := protected.Group("/config-webs")
+			{
+				configWebs.GET("", configHandler.ListWebs)
+				configWebs.PUT("", configHandler.SaveWebs)
+				configWebs.DELETE("/:id", configHandler.DeleteWeb)
 			}
 
 			// Logs
@@ -189,6 +231,69 @@ func SetupRouter(mode string) *gin.Engine {
 				permissions.POST("", permissionHandler.Create)
 				permissions.PUT("/:id", permissionHandler.Update)
 				permissions.DELETE("/:id", permissionHandler.Delete)
+			}
+
+			// Dict Types
+			dictTypes := protected.Group("/dict-types")
+			{
+				dictTypes.GET("", dictHandler.ListTypes)
+				dictTypes.POST("", dictHandler.CreateType)
+				dictTypes.PUT("/:id", dictHandler.UpdateType)
+				dictTypes.DELETE("/:id", dictHandler.DeleteType)
+			}
+
+			// Dicts
+			dicts := protected.Group("/dicts")
+			{
+				dicts.GET("", dictHandler.ListDicts)
+				dicts.POST("", dictHandler.CreateDict)
+				dicts.PUT("/:id", dictHandler.UpdateDict)
+				dicts.DELETE("/:id", dictHandler.DeleteDict)
+				dicts.GET("/code/:code", dictHandler.GetDictsByCode)
+			}
+
+			// Sites
+			sites := protected.Group("/sites")
+			{
+				sites.GET("", siteHandler.List)
+				sites.POST("", siteHandler.Create)
+				sites.PUT("/:id", siteHandler.Update)
+				sites.DELETE("/:id", siteHandler.Delete)
+			}
+
+			// Links
+			links := protected.Group("/links")
+			{
+				links.GET("", linkHandler.List)
+				links.POST("", linkHandler.Create)
+				links.PUT("/:id", linkHandler.Update)
+				links.DELETE("/:id", linkHandler.Delete)
+			}
+
+			// Crontabs
+			crontabs := protected.Group("/crontabs")
+			{
+				crontabs.GET("", crontabHandler.List)
+				crontabs.POST("", crontabHandler.Create)
+				crontabs.PUT("/:id", crontabHandler.Update)
+				crontabs.DELETE("/:id", crontabHandler.Delete)
+			}
+
+			// Database
+			db := protected.Group("/database")
+			{
+				db.GET("/tables", databaseHandler.Tables)
+				db.GET("/tables/:table/columns", databaseHandler.Columns)
+			}
+
+			// Cities
+			cities := protected.Group("/cities")
+			{
+				cities.GET("", cityHandler.List)
+				cities.GET("/tree", cityHandler.Tree)
+				cities.POST("", cityHandler.Create)
+				cities.PUT("/:id", cityHandler.Update)
+				cities.DELETE("/:id", cityHandler.Delete)
 			}
 
 			// Notifications

@@ -27,28 +27,55 @@ func RoleCodeToLevel(code string) int {
 	}
 }
 
-// GetUserRoleLevel 获取用户的最高权限等级（数字越小权限越高）
+// GetUserRoleLevel 获取用户的权限等级（数字越小权限越高）
 func GetUserRoleLevel(userID uint) int {
-	var roles []model.Role
-	database.DB.Raw(`
-		SELECT r.* FROM roles r
-		INNER JOIN user_roles ur ON ur.role_id = r.id
-		WHERE ur.user_id = ? AND r.deleted_at IS NULL
-	`, userID).Scan(&roles)
-
-	level := RoleLevelNone
-	for _, role := range roles {
-		l := RoleCodeToLevel(role.Code)
-		if l < level {
-			level = l
-		}
+	var user model.User
+	if err := database.DB.Select("is_admin").First(&user, userID).Error; err != nil {
+		return RoleLevelNone
 	}
-	return level
+	
+	switch user.IsAdmin {
+	case 2: // 超级管理员
+		return RoleLevelSuperAdmin
+	case 1: // 管理员/租户
+		return RoleLevelAdmin
+	case 0: // 普通用户，需要查角色
+		var roles []model.Role
+		database.DB.Raw(`
+			SELECT r.* FROM roles r
+			INNER JOIN user_roles ur ON ur.role_id = r.id
+			WHERE ur.user_id = ? AND r.deleted_at IS NULL
+		`, userID).Scan(&roles)
+
+		level := RoleLevelUser
+		for _, role := range roles {
+			l := RoleCodeToLevel(role.Code)
+			if l < level {
+				level = l
+			}
+		}
+		return level
+	default:
+		return RoleLevelNone
+	}
 }
 
 // IsSuperAdmin 判断用户是否为超级管理员
 func IsSuperAdmin(userID uint) bool {
-	return GetUserRoleLevel(userID) == RoleLevelSuperAdmin
+	var user model.User
+	if err := database.DB.Select("is_admin").First(&user, userID).Error; err != nil {
+		return false
+	}
+	return user.IsAdmin == 2
+}
+
+// IsAdmin 判断用户是否为管理员（包括超级管理员和租户管理员）
+func IsAdmin(userID uint) bool {
+	var user model.User
+	if err := database.DB.Select("is_admin").First(&user, userID).Error; err != nil {
+		return false
+	}
+	return user.IsAdmin >= 1
 }
 
 // HasHigherOrEqualLevel 判断操作者是否有权操作目标用户

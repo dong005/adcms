@@ -11,7 +11,7 @@ export const overridesPreferences = defineOverridesPreferences({
     name: import.meta.env.VITE_APP_TITLE,
     accessMode: 'backend',
     enableRefreshToken: false,
-    locale: 'zh', // 设置默认语言为中文
+    locale: 'zh-CN', // 设置默认语言为中文
     defaultHomePath: '/dashboard/analytics', // 设置默认首页路径
   },
 });

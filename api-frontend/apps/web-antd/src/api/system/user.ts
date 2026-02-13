@@ -14,6 +14,15 @@ export interface UserRecord {
   last_login_ip: string;
   created_at: string;
   roles?: RoleRecord[];
+  department_id?: number;
+  // 新增字段
+  is_admin: number;      // 0=普通 1=管理员 2=超管
+  company: string;
+  domain: string;
+  expire_time: string | null;
+  max_users: number;
+  login_count: number;
+  remark: string;
 }
 
 export interface RoleRecord {
@@ -60,4 +69,12 @@ export function resetUserPassword(id: number) {
 
 export function assignUserRoles(id: number, role_ids: number[]) {
   return requestClient.put(`/users/${id}/roles`, { role_ids });
+}
+
+export function assignUserMenus(id: number, menu_ids: number[]) {
+  return requestClient.put(`/users/${id}/menus`, { menu_ids });
+}
+
+export function unlockUser(id: number) {
+  return requestClient.put(`/users/${id}/unlock`);
 }

@@ -41,7 +41,7 @@ func GetUserPermissionCodes(userID uint) []string {
 			codes = append(codes, p.Code)
 		}
 	} else {
-		// 普通用户从 role_permissions 查询
+		// 从角色权限查询
 		var permissions []model.Permission
 		database.DB.Raw(`
 			SELECT DISTINCT p.* FROM permissions p
@@ -54,6 +54,9 @@ func GetUserPermissionCodes(userID uint) []string {
 		for _, p := range permissions {
 			codes = append(codes, p.Code)
 		}
+
+		// TODO: 这里可以扩展用户独立权限表
+		// 如果将来需要用户独立权限，可以在这里添加查询逻辑
 	}
 
 	// 写入缓存

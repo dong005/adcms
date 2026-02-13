@@ -118,3 +118,34 @@ func (r *UserRepository) GetUserRoles(userID uint) ([]model.Role, error) {
 	err := r.db.Preload("Roles").First(&user, userID).Error
 	return user.Roles, err
 }
+
+func (r *UserRepository) SetTenantID(userID, tenantID uint) error {
+	return r.db.Model(&model.User{}).Where("id = ?", userID).Update("tenant_id", tenantID).Error
+}
+
+func (r *UserRepository) AssignMenus(userID uint, menuIDs []uint) error {
+	// 先清除旧记录
+	if err := r.db.Where("user_id = ?", userID).Delete(&model.UserMenu{}).Error; err != nil {
+		return err
+	}
+
+	// 批量插入新记录
+	for _, menuID := range menuIDs {
+		userMenu := model.UserMenu{
+			UserID: userID,
+			MenuID: menuID,
+		}
+		if err := r.db.Create(&userMenu).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *UserRepository) GetUserMenus(userID uint) ([]model.Menu, error) {
+	var menus []model.Menu
+	err := r.db.Joins("JOIN user_menus ON user_menus.menu_id = menus.id").
+		Where("user_menus.user_id = ?", userID).
+		Find(&menus).Error
+	return menus, err
+}

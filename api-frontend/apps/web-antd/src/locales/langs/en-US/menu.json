@@ -57,7 +57,18 @@
     "DepartmentManagement": "Department Management",
     "PermissionManagement": "Permission Management",
     "NotificationManagement": "Notification Management",
-    "EmailConfig": "Email Config"
+    "EmailConfig": "Email Config",
+    "SmsConfig": "SMS Config",
+    "DictManagement": "Dictionary",
+    "SiteManagement": "Site Management",
+    "LinkManagement": "Links",
+    "CityManagement": "Regions",
+    "CrontabManagement": "Cron Jobs",
+    "DatabaseManagement": "Database",
+    "DataManagement": "Data",
+    "OpsManagement": "Operations",
+    "ConfigGroupManagement": "Config Groups",
+    "ConfigWebManagement": "Website Settings"
   },
   "auth": {
     "login": "Login",
