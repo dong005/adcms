@@ -80,12 +80,15 @@ func SetupRouter(mode string) *gin.Engine {
 			{
 				menus.GET("", menuHandler.List)
 				menus.GET("/tree", menuHandler.Tree)
+				menus.GET("/tree-with-buttons", menuHandler.TreeWithButtons)
 				menus.GET("/user", menuHandler.UserMenus)
 				menus.POST("", menuHandler.Create)
 				menus.PUT("/:id", menuHandler.Update)
 				menus.DELETE("/:id", menuHandler.Delete)
-				menus.GET("/:id/menus", menuHandler.GetUserMenus) // 新增
-				menus.PUT("/:id/menus", menuHandler.AssignUserMenus) // 新增
+				menus.GET("/:id/buttons", menuHandler.GetButtons)
+				menus.PUT("/:id/buttons", menuHandler.SaveButtons)
+				menus.GET("/:id/menus", menuHandler.GetUserMenus)
+				menus.PUT("/:id/menus", menuHandler.AssignUserMenus)
 			}
 
 			// Users
@@ -101,6 +104,7 @@ func SetupRouter(mode string) *gin.Engine {
 				users.PUT("/:id/roles", userHandler.AssignRoles)
 				users.PUT("/:id/menus", userHandler.AssignMenus) // 新增
 				users.PUT("/:id/unlock", userHandler.UnlockUser)
+				users.POST("/:id/login-as", userHandler.LoginAs)
 				users.GET("/export", userHandler.Export)
 				users.GET("/import-template", userHandler.ImportTemplate)
 				users.POST("/import", userHandler.Import)

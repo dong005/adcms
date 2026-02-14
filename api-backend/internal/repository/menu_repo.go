@@ -35,7 +35,7 @@ func (r *MenuRepository) FindByID(id uint) (*model.Menu, error) {
 
 func (r *MenuRepository) FindAll(tenantID uint, isAdmin bool) ([]model.Menu, error) {
 	var menus []model.Menu
-	query := r.db.Where("status = 1")
+	query := r.db.Where("status = 1 AND type != 4")
 	
 	if isAdmin {
 		// 超管可以看到所有菜单
@@ -51,12 +51,55 @@ func (r *MenuRepository) FindAll(tenantID uint, isAdmin bool) ([]model.Menu, err
 	return menus, err
 }
 
+// FindAllWithButtons 获取所有菜单（含 Type=4 按钮节点），用于角色分配权限
+func (r *MenuRepository) FindAllWithButtons(tenantID uint, isAdmin bool) ([]model.Menu, error) {
+	var menus []model.Menu
+	query := r.db.Where("status = 1")
+	
+	if isAdmin {
+		query = query.Order("sort ASC, id ASC")
+	} else {
+		query = query.Where("tenant_id = 0 OR tenant_id = ?", tenantID).
+			Where("is_tenant = 1").
+			Order("sort ASC, id ASC")
+	}
+	
+	err := query.Find(&menus).Error
+	return menus, err
+}
+
+// FindButtons 获取指定菜单下的按钮节点
+func (r *MenuRepository) FindButtons(parentID uint) ([]model.Menu, error) {
+	var menus []model.Menu
+	err := r.db.Where("parent_id = ? AND type = 4", parentID).Order("sort ASC, id ASC").Find(&menus).Error
+	return menus, err
+}
+
+// SaveButtons 批量保存菜单的按钮节点
+func (r *MenuRepository) SaveButtons(parentID uint, buttons []model.Menu) error {
+	// 删除旧的按钮节点
+	if err := r.db.Where("parent_id = ? AND type = 4", parentID).Delete(&model.Menu{}).Error; err != nil {
+		return err
+	}
+	// 创建新的按钮节点
+	for i := range buttons {
+		buttons[i].ParentID = parentID
+		buttons[i].Type = 4
+		buttons[i].Status = 1
+		buttons[i].ID = 0
+		if err := r.db.Create(&buttons[i]).Error; err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func (r *MenuRepository) FindByRoleIDs(roleIDs []uint) ([]model.Menu, error) {
 	var menus []model.Menu
 	err := r.db.Distinct().
 		Joins("JOIN role_menus ON role_menus.menu_id = menus.id").
 		Where("role_menus.role_id IN ?", roleIDs).
-		Where("menus.status = 1").
+		Where("menus.status = 1 AND menus.type != 4").
 		Order("menus.sort ASC, menus.id ASC").
 		Find(&menus).Error
 	if err != nil {

@@ -31,9 +31,10 @@ const localesMap = loadLocalesMapFromDir(
  * @param lang
  */
 async function loadMessages(lang: SupportedLanguagesType) {
+  const actualLang = lang === ('zh' as any) ? 'zh-CN' as SupportedLanguagesType : lang;
   const [appLocaleMessages] = await Promise.all([
-    localesMap[lang]?.(),
-    loadThirdPartyMessage(lang),
+    localesMap[actualLang]?.(),
+    loadThirdPartyMessage(actualLang),
   ]);
   return appLocaleMessages?.default ?? {};
 }

@@ -181,6 +181,81 @@ func (h *MenuHandler) Tree(c *gin.Context) {
 	utils.Success(c, tree)
 }
 
+// TreeWithButtons 获取含按钮节点的完整菜单树（用于角色分配权限）
+func (h *MenuHandler) TreeWithButtons(c *gin.Context) {
+	tenantID := middleware.GetTenantID(c)
+	isAdmin := middleware.IsAdmin(middleware.GetUserID(c))
+	menus, err := h.menuRepo.FindAllWithButtons(tenantID, isAdmin)
+	if err != nil {
+		utils.ServerError(c, "查询失败")
+		return
+	}
+
+	tree := repository.BuildMenuTree(menus, 0)
+	utils.Success(c, tree)
+}
+
+// GetButtons 获取菜单下的按钮节点
+func (h *MenuHandler) GetButtons(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		utils.BadRequest(c, "参数错误")
+		return
+	}
+
+	buttons, err := h.menuRepo.FindButtons(uint(id))
+	if err != nil {
+		utils.ServerError(c, "查询失败")
+		return
+	}
+
+	utils.Success(c, buttons)
+}
+
+type SaveButtonsRequest struct {
+	Buttons []ButtonItem `json:"buttons"`
+}
+
+type ButtonItem struct {
+	Title          string `json:"title"`
+	Name           string `json:"name"`
+	PermissionCode string `json:"permission_code"`
+	Sort           int    `json:"sort"`
+}
+
+// SaveButtons 批量保存菜单的按钮节点
+func (h *MenuHandler) SaveButtons(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		utils.BadRequest(c, "参数错误")
+		return
+	}
+
+	var req SaveButtonsRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.BadRequest(c, "参数错误")
+		return
+	}
+
+	var buttons []model.Menu
+	for _, b := range req.Buttons {
+		buttons = append(buttons, model.Menu{
+			Title:          b.Title,
+			Name:           b.Name,
+			PermissionCode: b.PermissionCode,
+			Sort:           b.Sort,
+			IsTenant:       1,
+		})
+	}
+
+	if err := h.menuRepo.SaveButtons(uint(id), buttons); err != nil {
+		utils.ServerError(c, "保存失败")
+		return
+	}
+
+	utils.SuccessWithMessage(c, "保存成功", nil)
+}
+
 func (h *MenuHandler) UserMenus(c *gin.Context) {
 	userID := middleware.GetUserID(c)
 

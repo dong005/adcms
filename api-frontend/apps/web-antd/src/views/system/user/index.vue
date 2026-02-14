@@ -3,23 +3,30 @@ import { ref, reactive, onMounted } from 'vue';
 import {
   Table, Button, Tag, Space, Modal, Form, FormItem, Input, InputNumber,
   Select, SelectOption, Popconfirm, message, Switch, Card, TreeSelect,
-  DatePicker, Tree,
+  DatePicker,
 } from 'ant-design-vue';
 import dayjs from 'dayjs';
 import {
   getUserList, createUser, updateUser, deleteUser,
   toggleUserStatus, resetUserPassword, assignUserRoles,
-  assignUserMenus, unlockUser,
+  unlockUser, loginAsUser,
 } from '#/api/system/user';
 import { getRoleList } from '#/api/system/role';
 import { getDepartmentTree } from '#/api/system/department';
-import { getMenuList } from '#/api/system/menu';
 import { useAccess } from '@vben/access';
+import { useAccessStore, useUserStore } from '@vben/stores';
+import { useRouter } from 'vue-router';
+import { useAuthStore } from '#/store';
+import { getAccessCodesApi } from '#/api';
 import type { UserRecord } from '#/api/system/user';
 import type { RoleRecord } from '#/api/system/role';
 import type { DepartmentRecord } from '#/api/system/department';
 
 const { hasAccessByCodes } = useAccess();
+const accessStore = useAccessStore();
+const userStore = useUserStore();
+const authStore = useAuthStore();
+const router = useRouter();
 
 const loading = ref(false);
 const dataSource = ref<UserRecord[]>([]);
@@ -29,12 +36,7 @@ const pagination = reactive({ current: 1, pageSize: 10 });
 
 const modalVisible = ref(false);
 const modalTitle = ref('新增用户');
-const menuModalVisible = ref(false);
 const currentUserId = ref(0);
-const selectedMenuKeys = ref<number[]>([]);
-const halfCheckedMenuKeys = ref<number[]>([]);
-const menuTreeData = ref<any[]>([]);
-const menuList = ref<any[]>([]);
 const roleModalVisible = ref(false);
 const selectedRoleIds = ref<number[]>([]);
 const roleList = ref<RoleRecord[]>([]);
@@ -188,6 +190,25 @@ async function handleUnlock(id: number) {
   fetchData();
 }
 
+async function handleLoginAs(record: UserRecord) {
+  try {
+    const res = await loginAsUser(record.id);
+    if (res.token) {
+      accessStore.setAccessToken(res.token);
+      const [userInfo, accessCodes] = await Promise.all([
+        authStore.fetchUserInfo(),
+        getAccessCodesApi(),
+      ]);
+      userStore.setUserInfo(userInfo);
+      accessStore.setAccessCodes(accessCodes);
+      message.success(`已切换为用户 [${record.username}]`);
+      router.push('/');
+    }
+  } catch {
+    // error handled by interceptor
+  }
+}
+
 function handleAssignRoles(record: UserRecord) {
   currentUserId.value = record.id;
   selectedRoleIds.value = (record.roles || []).map((r) => r.id);
@@ -201,60 +222,6 @@ async function handleSaveRoles() {
   fetchData();
 }
 
-function buildMenuTree(menus: any[]): any[] {
-  return menus.map((m) => ({
-    key: m.id,
-    title: m.title || m.name,
-    children: m.children ? buildMenuTree(m.children) : [],
-  }));
-}
-
-// 收集树中所有非叶子节点的 key
-function collectParentKeys(tree: any[]): Set<number> {
-  const parentKeys = new Set<number>();
-  function walk(nodes: any[]) {
-    for (const node of nodes) {
-      if (node.children && node.children.length > 0) {
-        parentKeys.add(node.key);
-        walk(node.children);
-      }
-    }
-  }
-  walk(tree);
-  return parentKeys;
-}
-
-async function fetchMenuTree() {
-  const menus = await getMenuList();
-  menuList.value = menus;
-  menuTreeData.value = buildMenuTree(menus);
-}
-
-function handleAssignMenus(record: UserRecord) {
-  currentUserId.value = record.id;
-  fetchMenuTree();
-  // TODO: 加载用户已分配的菜单
-  selectedMenuKeys.value = [];
-  halfCheckedMenuKeys.value = [];
-  menuModalVisible.value = true;
-}
-
-function handleMenuCheck(checked: any, info: any) {
-  if (Array.isArray(checked)) {
-    selectedMenuKeys.value = checked as number[];
-    halfCheckedMenuKeys.value = (info?.halfCheckedKeys || []) as number[];
-  } else {
-    selectedMenuKeys.value = (checked.checked || []) as number[];
-    halfCheckedMenuKeys.value = (checked.halfChecked || []) as number[];
-  }
-}
-
-async function handleSaveMenus() {
-  const allMenuIds = [...new Set([...selectedMenuKeys.value, ...halfCheckedMenuKeys.value])];
-  await assignUserMenus(currentUserId.value, allMenuIds);
-  message.success('菜单分配成功');
-  menuModalVisible.value = false;
-}
 
 function handleTableChange(pag: any) {
   pagination.current = pag.current;
@@ -322,12 +289,14 @@ onMounted(() => {
             <Space>
               <Button v-if="hasAccessByCodes(['user:update'])" size="small" type="link" @click="handleEdit(record as UserRecord)">编辑</Button>
               <Button v-if="hasAccessByCodes(['user:assign-roles'])" size="small" type="link" @click="handleAssignRoles(record as UserRecord)">分配角色</Button>
-              <Button v-if="hasAccessByCodes(['user:assign-menus'])" size="small" type="link" @click="handleAssignMenus(record as UserRecord)">分配菜单</Button>
               <Popconfirm v-if="hasAccessByCodes(['user:reset-password'])" title="确认重置密码？" @confirm="handleResetPassword((record as UserRecord).id)">
                 <Button size="small" type="link">重置密码</Button>
               </Popconfirm>
               <Popconfirm v-if="(record as UserRecord).status === 2 && hasAccessByCodes(['user:unlock'])" title="确认解锁该用户？" @confirm="handleUnlock((record as UserRecord).id)">
                 <Button size="small" type="link" style="color: orange">解锁</Button>
+              </Popconfirm>
+              <Popconfirm v-if="userStore.userInfo?.is_admin === 2 && (record as UserRecord).is_admin !== 2" title="确认以该用户身份登录？" @confirm="handleLoginAs(record as UserRecord)">
+                <Button size="small" type="link" style="color: #722ed1">登录</Button>
               </Popconfirm>
               <Popconfirm v-if="hasAccessByCodes(['user:delete'])" title="确认删除？" @confirm="handleDelete((record as UserRecord).id)">
                 <Button size="small" type="link" danger>删除</Button>
@@ -408,16 +377,5 @@ onMounted(() => {
       </Select>
     </Modal>
 
-    <Modal v-model:open="menuModalVisible" title="分配菜单" @ok="handleSaveMenus" :width="480">
-      <div class="mt-4" style="max-height: 400px; overflow-y: auto;">
-        <Tree
-          v-model:checkedKeys="selectedMenuKeys"
-          :tree-data="menuTreeData"
-          checkable
-          default-expand-all
-          @check="handleMenuCheck"
-        />
-      </div>
-    </Modal>
   </div>
 </template>

@@ -298,6 +298,7 @@ type UserInfoResponse struct {
 	TenantID    uint     `json:"tenant_id"`
 	TOTPEnabled bool     `json:"totp_enabled"`
 	EmailNotify int8     `json:"email_notify"`
+	IsAdmin     int8     `json:"is_admin"`
 	Roles       []string `json:"roles"`
 	Permissions []string `json:"permissions"`
 }
@@ -331,6 +332,7 @@ func (h *AuthHandler) GetUserInfo(c *gin.Context) {
 		TenantID:    user.TenantID,
 		TOTPEnabled: user.TOTPEnabled == 1,
 		EmailNotify: user.EmailNotify,
+		IsAdmin:     user.IsAdmin,
 		Roles:       roleNames,
 		Permissions: permissions,
 	})

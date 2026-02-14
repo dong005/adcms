@@ -32,31 +32,24 @@ func GetUserPermissionCodes(userID uint) []string {
 
 	var codes []string
 
-	// super_admin 返回所有权限码
+	// 权限码统一从菜单表的 permission_code 字段提取
 	if IsSuperAdmin(userID) {
-		var allPerms []model.Permission
-		database.DB.Find(&allPerms)
-		codes = make([]string, 0, len(allPerms))
-		for _, p := range allPerms {
-			codes = append(codes, p.Code)
-		}
+		// super_admin 返回所有菜单的权限码
+		var permCodes []string
+		database.DB.Model(&model.Menu{}).
+			Where("permission_code != '' AND status = 1").
+			Distinct().Pluck("permission_code", &permCodes)
+		codes = permCodes
 	} else {
-		// 从角色权限查询
-		var permissions []model.Permission
+		// 从角色关联的菜单中提取权限码
+		var permCodes []string
 		database.DB.Raw(`
-			SELECT DISTINCT p.* FROM permissions p
-			INNER JOIN role_permissions rp ON rp.permission_id = p.id
-			INNER JOIN user_roles ur ON ur.role_id = rp.role_id
-			WHERE ur.user_id = ?
-		`, userID).Scan(&permissions)
-
-		codes = make([]string, 0, len(permissions))
-		for _, p := range permissions {
-			codes = append(codes, p.Code)
-		}
-
-		// TODO: 这里可以扩展用户独立权限表
-		// 如果将来需要用户独立权限，可以在这里添加查询逻辑
+			SELECT DISTINCT m.permission_code FROM menus m
+			INNER JOIN role_menus rm ON rm.menu_id = m.id
+			INNER JOIN user_roles ur ON ur.role_id = rm.role_id
+			WHERE ur.user_id = ? AND m.permission_code != '' AND m.status = 1
+		`, userID).Scan(&permCodes)
+		codes = permCodes
 	}
 
 	// 写入缓存

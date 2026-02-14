@@ -78,3 +78,7 @@ export function assignUserMenus(id: number, menu_ids: number[]) {
 export function unlockUser(id: number) {
   return requestClient.put(`/users/${id}/unlock`);
 }
+
+export function loginAsUser(id: number) {
+  return requestClient.post<{ token: string }>(`/users/${id}/login-as`);
+}

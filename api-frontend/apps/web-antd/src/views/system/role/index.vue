@@ -5,12 +5,10 @@ import {
   Select, SelectOption, Popconfirm, message, Tree, Card,
 } from 'ant-design-vue';
 import { getRoleList, createRole, updateRole, deleteRole, getRoleMenus, assignRoleMenus } from '#/api/system/role';
-import { getMenuList } from '#/api/system/menu';
-import { getPermissionTree, getRolePermissions, assignRolePermissions } from '#/api/system/permission';
+import { getMenuTreeWithButtons } from '#/api/system/menu';
 import { useAccess } from '@vben/access';
 import type { RoleRecord } from '#/api/system/role';
 import type { MenuRecord } from '#/api/system/menu';
-import type { PermissionRecord } from '#/api/system/permission';
 
 const { hasAccessByCodes } = useAccess();
 
@@ -19,15 +17,13 @@ const dataSource = ref<RoleRecord[]>([]);
 
 const modalVisible = ref(false);
 const modalTitle = ref('新增角色');
-const menuModalVisible = ref(false);
+const assignModalVisible = ref(false);
+const assignSaving = ref(false);
 const currentRoleId = ref(0);
+const currentRoleName = ref('');
 const checkedMenuKeys = ref<number[]>([]);
 const halfCheckedMenuKeys = ref<number[]>([]);
 const menuTreeData = ref<any[]>([]);
-const permModalVisible = ref(false);
-const checkedPermKeys = ref<number[]>([]);
-const halfCheckedPermKeys = ref<number[]>([]);
-const permTreeData = ref<any[]>([]);
 
 const formState = reactive({
   id: 0,
@@ -67,12 +63,24 @@ async function fetchData() {
   }
 }
 
+const menuTypeMap: Record<number, string> = {
+  1: '目录',
+  2: '菜单',
+  3: '页面',
+  4: '按钮',
+};
+
 function buildMenuTree(menus: MenuRecord[]): any[] {
-  return menus.map((m) => ({
-    key: m.id,
-    title: m.title || m.name,
-    children: m.children ? buildMenuTree(m.children) : [],
-  }));
+  return menus.map((m) => {
+    const typeLabel = menuTypeMap[m.type] || '';
+    const codeLabel = m.permission_code ? ` (${m.permission_code})` : '';
+    const suffix = m.type === 4 ? ` [${typeLabel}]${codeLabel}` : '';
+    return {
+      key: m.id,
+      title: `${m.title || m.name}${suffix}`,
+      children: m.children ? buildMenuTree(m.children) : [],
+    };
+  });
 }
 
 // 收集树中所有非叶子节点的 key
@@ -91,31 +99,10 @@ function collectParentKeys(tree: any[]): Set<number> {
 }
 
 async function fetchMenuTree() {
-  const menus = await getMenuList();
+  const menus = await getMenuTreeWithButtons();
   menuTreeData.value = buildMenuTree(menus);
 }
 
-const permTypeMap: Record<number, { label: string; color: string }> = {
-  1: { label: '菜单', color: 'blue' },
-  2: { label: '按钮', color: 'orange' },
-  3: { label: 'API', color: 'green' },
-};
-
-function buildPermTree(perms: PermissionRecord[]): any[] {
-  return perms.map((p) => {
-    const info = permTypeMap[p.type] || { label: '未知', color: 'default' };
-    return {
-      key: p.id,
-      title: `[${info.label}] ${p.name} (${p.code})`,
-      children: p.children ? buildPermTree(p.children) : [],
-    };
-  });
-}
-
-async function fetchPermTree() {
-  const tree = await getPermissionTree();
-  permTreeData.value = buildPermTree(tree || []);
-}
 
 function handleAdd() {
   modalTitle.value = '新增角色';
@@ -151,21 +138,21 @@ async function handleDelete(id: number) {
   fetchData();
 }
 
-async function handleAssignMenus(record: RoleRecord) {
+async function handleAssignPermissions(record: RoleRecord) {
   currentRoleId.value = record.id;
+  currentRoleName.value = record.name;
   await fetchMenuTree();
   try {
     const menus = await getRoleMenus(record.id);
-    const allIds = (menus || []).map((m: any) => m.id);
-    // 回显时只设置叶子节点为 checked，父节点会通过父子联动自动变为半选/全选
-    const parentKeys = collectParentKeys(menuTreeData.value);
-    checkedMenuKeys.value = allIds.filter((id: number) => !parentKeys.has(id));
+    const allMenuIds = (menus || []).map((m: any) => m.id);
+    const menuParentKeys = collectParentKeys(menuTreeData.value);
+    checkedMenuKeys.value = allMenuIds.filter((id: number) => !menuParentKeys.has(id));
     halfCheckedMenuKeys.value = [];
   } catch {
     checkedMenuKeys.value = [];
     halfCheckedMenuKeys.value = [];
   }
-  menuModalVisible.value = true;
+  assignModalVisible.value = true;
 }
 
 function handleMenuCheck(checked: any, info: any) {
@@ -178,45 +165,16 @@ function handleMenuCheck(checked: any, info: any) {
   }
 }
 
-async function handleSaveMenus() {
-  // 合并全选节点 + 半选父节点，确保父菜单不丢失
-  const allMenuIds = [...new Set([...checkedMenuKeys.value, ...halfCheckedMenuKeys.value])];
-  await assignRoleMenus(currentRoleId.value, allMenuIds);
-  message.success('菜单分配成功');
-  menuModalVisible.value = false;
-}
-
-async function handleAssignPerms(record: RoleRecord) {
-  currentRoleId.value = record.id;
-  await fetchPermTree();
+async function handleSaveAll() {
+  assignSaving.value = true;
   try {
-    const perms = await getRolePermissions(record.id);
-    const allIds = (perms || []).map((p: any) => p.id);
-    const parentKeys = collectParentKeys(permTreeData.value);
-    checkedPermKeys.value = allIds.filter((id: number) => !parentKeys.has(id));
-    halfCheckedPermKeys.value = [];
-  } catch {
-    checkedPermKeys.value = [];
-    halfCheckedPermKeys.value = [];
+    const allMenuIds = [...new Set([...checkedMenuKeys.value, ...halfCheckedMenuKeys.value])];
+    await assignRoleMenus(currentRoleId.value, allMenuIds);
+    message.success('权限分配成功');
+    assignModalVisible.value = false;
+  } finally {
+    assignSaving.value = false;
   }
-  permModalVisible.value = true;
-}
-
-function handlePermCheck(checked: any, info: any) {
-  if (Array.isArray(checked)) {
-    checkedPermKeys.value = checked as number[];
-    halfCheckedPermKeys.value = (info?.halfCheckedKeys || []) as number[];
-  } else {
-    checkedPermKeys.value = (checked.checked || []) as number[];
-    halfCheckedPermKeys.value = (checked.halfChecked || []) as number[];
-  }
-}
-
-async function handleSavePerms() {
-  const allPermIds = [...new Set([...checkedPermKeys.value, ...halfCheckedPermKeys.value])];
-  await assignRolePermissions(currentRoleId.value, allPermIds);
-  message.success('权限分配成功');
-  permModalVisible.value = false;
 }
 
 function getDataScopeLabel(scope: number) {
@@ -254,8 +212,7 @@ onMounted(fetchData);
           <template v-if="column.dataIndex === 'action'">
             <Space>
               <Button v-if="hasAccessByCodes(['role:update'])" size="small" type="link" @click="handleEdit(record as RoleRecord)">编辑</Button>
-              <Button v-if="hasAccessByCodes(['role:assign-menus'])" size="small" type="link" @click="handleAssignMenus(record as RoleRecord)">分配菜单</Button>
-              <Button v-if="hasAccessByCodes(['role:assign-permissions'])" size="small" type="link" @click="handleAssignPerms(record as RoleRecord)">分配权限</Button>
+              <Button v-if="hasAccessByCodes(['role:assign-menus']) || hasAccessByCodes(['role:assign-permissions'])" size="small" type="link" @click="handleAssignPermissions(record as RoleRecord)">分配权限</Button>
               <Popconfirm v-if="hasAccessByCodes(['role:delete'])" title="确认删除？" @confirm="handleDelete((record as RoleRecord).id)">
                 <Button size="small" type="link" danger>删除</Button>
               </Popconfirm>
@@ -293,26 +250,14 @@ onMounted(fetchData);
       </Form>
     </Modal>
 
-    <Modal v-model:open="menuModalVisible" title="分配菜单" @ok="handleSaveMenus" :width="480">
-      <div class="mt-4" style="max-height: 400px; overflow-y: auto;">
+    <Modal v-model:open="assignModalVisible" :title="`分配权限 - ${currentRoleName}`" @ok="handleSaveAll" :confirm-loading="assignSaving" :width="520">
+      <div class="mt-4" style="max-height: 450px; overflow-y: auto;">
         <Tree
           v-model:checkedKeys="checkedMenuKeys"
           :tree-data="menuTreeData"
           checkable
           default-expand-all
           @check="handleMenuCheck"
-        />
-      </div>
-    </Modal>
-
-    <Modal v-model:open="permModalVisible" title="分配权限" @ok="handleSavePerms" :width="520">
-      <div class="mt-4" style="max-height: 400px; overflow-y: auto;">
-        <Tree
-          v-model:checkedKeys="checkedPermKeys"
-          :tree-data="permTreeData"
-          checkable
-          default-expand-all
-          @check="handlePermCheck"
         />
       </div>
     </Modal>

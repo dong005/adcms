@@ -53,3 +53,22 @@ export function getUserMenus(userId: number) {
 export function assignUserMenus(userId: number, menu_ids: number[]) {
   return requestClient.put(`/menus/${userId}/menus`, { menu_ids });
 }
+
+export interface ButtonRecord {
+  title: string;
+  name: string;
+  permission_code: string;
+  sort: number;
+}
+
+export function getMenuButtons(menuId: number) {
+  return requestClient.get<MenuRecord[]>(`/menus/${menuId}/buttons`);
+}
+
+export function saveMenuButtons(menuId: number, buttons: ButtonRecord[]) {
+  return requestClient.put(`/menus/${menuId}/buttons`, { buttons });
+}
+
+export function getMenuTreeWithButtons() {
+  return requestClient.get<MenuRecord[]>('/menus/tree-with-buttons');
+}

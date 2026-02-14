@@ -7,6 +7,7 @@ import (
 	"adcms/pkg/database"
 	"adcms/pkg/excel"
 	"adcms/pkg/utils"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -470,4 +471,55 @@ func (h *UserHandler) UnlockUser(c *gin.Context) {
 	}
 
 	utils.SuccessWithMessage(c, "用户已解锁", nil)
+}
+
+// LoginAs 超管以指定用户身份登录
+func (h *UserHandler) LoginAs(c *gin.Context) {
+	if !middleware.IsSuperAdmin(middleware.GetUserID(c)) {
+		utils.Forbidden(c, "仅超级管理员可使用此功能")
+		return
+	}
+
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		utils.BadRequest(c, "参数错误")
+		return
+	}
+
+	// 不允许对自己使用
+	if uint(id) == middleware.GetUserID(c) {
+		utils.Fail(c, 4005, "不能以自己的身份重新登录")
+		return
+	}
+
+	user, err := h.userRepo.FindByID(uint(id))
+	if err != nil {
+		utils.Fail(c, 3002, "用户不存在")
+		return
+	}
+
+	if user.Status != 1 {
+		utils.Fail(c, 4006, "该用户状态异常，无法登录")
+		return
+	}
+
+	token, err := utils.GenerateToken(user.ID, user.TenantID, user.Username, user.IsAdmin)
+	if err != nil {
+		utils.ServerError(c, "生成token失败")
+		return
+	}
+
+	// 记录登录日志
+	adminName := middleware.GetUsername(c)
+	database.DB.Create(&model.LoginLog{
+		TenantID:  user.TenantID,
+		UserID:    user.ID,
+		Username:  user.Username,
+		IP:        c.ClientIP(),
+		UserAgent: c.Request.UserAgent(),
+		Status:    1,
+		Message:   fmt.Sprintf("超管[%s]代登录", adminName),
+	})
+
+	utils.Success(c, gin.H{"token": token})
 }

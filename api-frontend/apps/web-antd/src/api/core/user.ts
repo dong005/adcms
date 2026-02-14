@@ -16,6 +16,7 @@ export async function getUserInfoApi() {
     roles: string[];
     totp_enabled: boolean;
     email_notify: number;
+    is_admin: number;
   }>('/auth/user-info');
   return {
     userId: `${res.id}`,
@@ -30,6 +31,7 @@ export async function getUserInfoApi() {
     phone: res.phone || '',
     totp_enabled: res.totp_enabled || false,
     email_notify: res.email_notify ?? 1,
+    is_admin: res.is_admin ?? 0,
   } as UserInfo;
 }
 
